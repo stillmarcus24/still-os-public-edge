@@ -1,0 +1,551 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Still OS Notary API",
+    "version": "1.0.1",
+    "description": "Signed, fail-closed verification, screening, and proprietary research primitives for autonomous agents, operated by Still OS Digital Holdings. Every response is Ed25519-signed and independently verifiable. Full x402 payment schema: GET /.well-known/x402. Agent card: GET /notary/.well-known/agent-card.json.",
+    "contact": {
+      "email": "stillmarcus24@gmail.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://nolawealthfinancial.com"
+    }
+  ],
+  "paths": {
+    "/notary/commit": {
+      "post": {
+        "summary": "Commit a claim hash -- tamper-evident, Ed25519-signed receipt, no resolver attached.",
+        "description": "Pricing: $0.10 USDC (Base) via x402, no free tier.",
+        "operationId": "commit",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "claim": {
+                    "type": "string",
+                    "description": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/dispute": {
+      "post": {
+        "summary": "File a bonded dispute against a verdict receipt, resolved by independent re-run.",
+        "description": "Pricing: $1 USDC (Base) via x402, non-refundable either way.",
+        "operationId": "dispute",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "receipt_hash": {
+                    "type": "string",
+                    "description": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/grade-strategy": {
+      "post": {
+        "summary": "Grade a settled trading track record: fail-closed REAL_EDGE|REGIME_LUCK|NEGATIVE_EV|INSUFFICIENT_DATA verdict, Ed25519-signed.",
+        "description": "Pricing: Free up to 2/agent/day, then $0.25 USDC (Base) via x402.",
+        "operationId": "grade_strategy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "trades": {
+                    "type": "string",
+                    "description": "[{t, price, side, outcome}]"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/screen-entity": {
+      "post": {
+        "summary": "OFAC SDN sanctions name screen, signed receipt with source-freshness timestamp.",
+        "description": "Pricing: Free up to 5/agent/day, then $0.02 USDC (Base) via x402.",
+        "operationId": "screen_entity",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "entity": {
+                    "type": "string",
+                    "description": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/regulatory-rules": {
+      "post": {
+        "summary": "Search recent Federal Register RULE documents by agency and/or keyword, signed receipt.",
+        "description": "Pricing: Free up to 15/agent/day, then $0.02 USDC (Base) via x402.",
+        "operationId": "regulatory_rules",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "agency": {
+                    "type": "string",
+                    "description": "string (optional)"
+                  },
+                  "keyword": {
+                    "type": "string",
+                    "description": "string (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/federal-awards": {
+      "post": {
+        "summary": "Search top-100-by-amount federal contract award snapshot (trailing 30 days), signed receipt.",
+        "description": "Pricing: Free up to 15/agent/day, then $0.02 USDC (Base) via x402.",
+        "operationId": "federal_awards",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "recipient": {
+                    "type": "string",
+                    "description": "string (optional)"
+                  },
+                  "min_amount": {
+                    "type": "string",
+                    "description": "number (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/insider-conviction": {
+      "post": {
+        "summary": "Proprietary conviction score over EDGAR Form 4 insider cluster buys, signed receipt.",
+        "description": "Pricing: Free up to 3/agent/day, then $0.1 USDC (Base) via x402.",
+        "operationId": "insider_conviction",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "ticker": {
+                    "type": "string",
+                    "description": "string (optional)"
+                  },
+                  "min_conviction": {
+                    "type": "string",
+                    "description": "number (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/smart-money": {
+      "post": {
+        "summary": "Proprietary 13D activist x insider conviction composite, signed receipt.",
+        "description": "Pricing: Free up to 3/agent/day, then $0.1 USDC (Base) via x402.",
+        "operationId": "smart_money",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "ticker": {
+                    "type": "string",
+                    "description": "string (optional)"
+                  },
+                  "apex_only": {
+                    "type": "string",
+                    "description": "boolean (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/distress-score": {
+      "post": {
+        "summary": "Validated distress-foresight score for a single ticker (71% sens / 100% spec / ~109d lead), live SEC fetch.",
+        "description": "Pricing: Free up to 3/agent/day, then $0.15 USDC (Base) via x402.",
+        "operationId": "distress_score",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "ticker": {
+                    "type": "string",
+                    "description": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/claim-verdict": {
+      "post": {
+        "summary": "Commit a claim, resolve it against a named external resolver, receive a signed verdict.",
+        "description": "Pricing: Free up to 3/agent/day (+ reputation bonus), then $0.25 USDC (Base) via x402.",
+        "operationId": "claim_verdict",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "claim": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "resolver": {
+                    "type": "string",
+                    "description": "{ type, ...resolver-specific fields }"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/agent-clearance": {
+      "post": {
+        "summary": "Pre-transaction OFAC + on-chain wallet clearance for agent-to-agent payments, fused into CLEAR/REVIEW/BLOCK.",
+        "description": "Pricing: Free up to 2/agent/day, then $0.75 USDC (Base) via x402.",
+        "operationId": "agent_clearance",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "counterparty_name": {
+                    "type": "string",
+                    "description": "string (optional)"
+                  },
+                  "counterparty_wallet": {
+                    "type": "string",
+                    "description": "string EVM address (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/register-policy": {
+      "post": {
+        "summary": "Register a pre-action spend policy for an agent -- free, not a paid product.",
+        "description": "Pricing: Free, no x402.",
+        "operationId": "register_policy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "max_per_action": {
+                    "type": "string",
+                    "description": "number (optional)"
+                  },
+                  "max_per_day": {
+                    "type": "string",
+                    "description": "number (optional)"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "string (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    },
+    "/notary/authorize": {
+      "post": {
+        "summary": "Check a proposed spend against an agent's registered policy -- free, not a paid product.",
+        "description": "Pricing: Free, no x402.",
+        "operationId": "authorize",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "description": "number"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "string (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+          },
+          "402": {
+            "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
+          },
+          "429": {
+            "description": "Free-tier limit exceeded for this agent/day."
+          }
+        }
+      }
+    }
+  },
+  "x-payment-protocol": "x402",
+  "x-payment-discovery": "https://nolawealthfinancial.com/.well-known/x402",
+  "x-generated-from": "live discovery responses (GET on each documented endpoint), not hand-authored \u2014 see each endpoint's own 405 response for the same data"
+}

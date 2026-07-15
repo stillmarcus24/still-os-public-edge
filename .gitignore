@@ -1,0 +1,48 @@
+# Secrets — never commit
+.env
+.env.*
+secrets/
+**/secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+wallet*
+keystore*
+credentials*
+private*
+*.seed
+seed-phrase*
+
+# Except: sanitized fixtures are explicitly allowed back in (see below)
+
+# Runtime / build noise
+node_modules/
+logs/
+*.log
+*.jsonl
+backups/
+*.bak
+*.bak-*
+*.bak.*
+tmp/
+.cache/
+coverage/
+dist/
+build/
+.DS_Store
+
+# Raw production state — never the source of truth in git
+state/
+!tests/fixtures/sanitized/
+!tests/fixtures/sanitized/**
+!reports/examples/
+!reports/examples/**
+
+# The audit/scope reports ARE meant to be committed (they're sanitized by construction —
+# no secret values were ever written into them). Re-allow the reports/ dir itself, only
+# state/ and raw logs stay excluded above.
+!reports/
+!reports/*.md
+!reports/*.json
