@@ -1,0 +1,16 @@
+{
+  "name": "still-os-public-edge",
+  "version": "1.0.0",
+  "description": "Public edge for StillOS Notary service",
+  "main": "core/notary_service_marcus.cjs",
+  "scripts": {
+    "start": "node tests/run-local-server.cjs",
+    "syntax-check": "node tests/syntax-check.cjs",
+    "test:boundary": "node tests/notary/free-paid-boundary.test.cjs",
+    "test:attribution": "node tests/attribution/classification.test.cjs",
+    "test": "npm run syntax-check && npm run test:boundary && npm run test:attribution"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
