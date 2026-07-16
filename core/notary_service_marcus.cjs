@@ -1216,11 +1216,13 @@ const server = http.createServer((req, res) => {
       }
       try {
         const result = fedRegister.search({ agency: b.agency, keyword: b.keyword, limit: b.limit });
-        // FREE TIER = UNSIGNED (money-leak fix 2026-07-15, same pattern as grade-strategy
-        // 2026-07-09). Computed result is free forever; the Ed25519-signed, independently
-        // verifiable receipt is the paid product.
+        // Free tier preview: limit to 3 rules to prevent database scraping
+        if (result && Array.isArray(result.rules)) {
+          result.rules = result.rules.slice(0, 3);
+          result.preview_only = true;
+        }
         return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
-          upgrade: 'UNSIGNED — this result is not independently verifiable and cannot be shown to a counterparty. Retry this exact request with an x402 X-PAYMENT header for a signed, verifiable receipt.' });
+          upgrade: 'PREVIEW ONLY & UNSIGNED. The free tier limits rule search results to 3 records. Retry this exact request with an x402 X-PAYMENT header to receive the full dataset with a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });
     return;
@@ -1249,11 +1251,13 @@ const server = http.createServer((req, res) => {
       }
       try {
         const result = usaSpending.search({ recipient: b.recipient, min_amount: b.min_amount, limit: b.limit });
-        // FREE TIER = UNSIGNED (money-leak fix 2026-07-15, same pattern as grade-strategy
-        // 2026-07-09). Computed result is free forever; the Ed25519-signed, independently
-        // verifiable receipt is the paid product.
+        // Free tier preview: limit to 3 awards to prevent database scraping
+        if (result && Array.isArray(result.awards)) {
+          result.awards = result.awards.slice(0, 3);
+          result.preview_only = true;
+        }
         return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
-          upgrade: 'UNSIGNED — this result is not independently verifiable and cannot be shown to a counterparty. Retry this exact request with an x402 X-PAYMENT header for a signed, verifiable receipt.' });
+          upgrade: 'PREVIEW ONLY & UNSIGNED. The free tier limits award results to 3 records. Retry this exact request with an x402 X-PAYMENT header to receive the full dataset with a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });
     return;
@@ -1282,11 +1286,13 @@ const server = http.createServer((req, res) => {
       }
       try {
         const result = insiderConviction.top({ ticker: b.ticker, min_conviction: b.min_conviction, limit: b.limit });
-        // FREE TIER = UNSIGNED (money-leak fix 2026-07-15, same pattern as grade-strategy
-        // 2026-07-09). Computed result is free forever; the Ed25519-signed, independently
-        // verifiable receipt is the paid product.
+        // Free tier preview: redact proprietary detailed cluster details, only return summary score
+        if (result && Array.isArray(result.clusters)) {
+          result.clusters = [];
+          result.redacted = true;
+        }
         return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
-          upgrade: 'UNSIGNED — this result is not independently verifiable and cannot be shown to a counterparty. Retry this exact request with an x402 X-PAYMENT header for a signed, verifiable receipt.' });
+          upgrade: 'PROPRIETARY ANALYSIS REDACTED & UNSIGNED. The free tier only exposes the high-level conviction score. Retry this exact request with an x402 X-PAYMENT header to unlock the detailed Form 4 transactions list and a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });
     return;
@@ -1315,11 +1321,13 @@ const server = http.createServer((req, res) => {
       }
       try {
         const result = smartMoney.top({ ticker: b.ticker, apex_only: b.apex_only, limit: b.limit });
-        // FREE TIER = UNSIGNED (money-leak fix 2026-07-15, same pattern as grade-strategy
-        // 2026-07-09). Computed result is free forever; the Ed25519-signed, independently
-        // verifiable receipt is the paid product.
+        // Free tier preview: redact proprietary activist/insider signals array, only return summary composite
+        if (result && Array.isArray(result.signals)) {
+          result.signals = [];
+          result.redacted = true;
+        }
         return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
-          upgrade: 'UNSIGNED — this result is not independently verifiable and cannot be shown to a counterparty. Retry this exact request with an x402 X-PAYMENT header for a signed, verifiable receipt.' });
+          upgrade: 'PROPRIETARY ANALYSIS REDACTED & UNSIGNED. The free tier only exposes the composite score. Retry this exact request with an x402 X-PAYMENT header to unlock the detailed activator/insider transaction signals list and a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });
     return;

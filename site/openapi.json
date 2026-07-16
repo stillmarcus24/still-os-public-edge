@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Still OS Notary API",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Signed, fail-closed verification, screening, and proprietary research primitives for autonomous agents, operated by Still OS Digital Holdings. Every response is Ed25519-signed and independently verifiable. Full x402 payment schema: GET /.well-known/x402. Agent card: GET /notary/.well-known/agent-card.json.",
     "contact": {
       "email": "stillmarcus24@gmail.com"
@@ -17,7 +17,7 @@
     "/notary/commit": {
       "post": {
         "summary": "Commit a claim hash -- tamper-evident, Ed25519-signed receipt, no resolver attached.",
-        "description": "Pricing: $0.10 USDC (Base) via x402, no free tier.",
+        "description": "Pricing: $0.10 USDC (Base) via x402, no free tier. Requires X-Payment header.",
         "operationId": "commit",
         "requestBody": {
           "required": true,
@@ -28,20 +28,38 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "claim": {
                     "type": "string",
-                    "description": "string"
+                    "description": "The text or claim hash to commit/notarize",
+                    "example": "transaction-hash-0x123..."
                   }
-                }
+                },
+                "required": ["agent", "claim"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Ed25519-signed receipt or verdict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "receipt_hash": { "type": "string", "example": "7c4a86b3e..." },
+                    "signature": { "type": "string", "example": "dGhpcyBpcyBhIHNpZ25hdHVyZQ==" },
+                    "verify_url": { "type": "string", "example": "https://nolawealthfinancial.com/verify?hash=7c4a86b3e..." },
+                    "ts": { "type": "string", "format": "date-time", "example": "2026-07-16T06:12:13Z" },
+                    "agent": { "type": "string", "example": "agent-stillos-001" },
+                    "tier": { "type": "string", "example": "x402" }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -55,7 +73,7 @@
     "/notary/dispute": {
       "post": {
         "summary": "File a bonded dispute against a verdict receipt, resolved by independent re-run.",
-        "description": "Pricing: $1 USDC (Base) via x402, non-refundable either way.",
+        "description": "Pricing: $1 USDC (Base) via x402, non-refundable either way. Requires X-Payment header.",
         "operationId": "dispute",
         "requestBody": {
           "required": true,
@@ -66,20 +84,58 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
-                  "receipt_hash": {
+                  "verdict_receipt_hash": {
                     "type": "string",
-                    "description": "string"
+                    "description": "The receipt hash of the verdict being disputed",
+                    "example": "7c4a86b3e..."
+                  },
+                  "verdict_object": {
+                    "type": "object",
+                    "description": "The original verdict object being disputed",
+                    "example": { "verdict": "FALSE" }
+                  },
+                  "original_resolver_spec": {
+                    "type": "object",
+                    "description": "The spec used for original resolution",
+                    "example": { "type": "web-poll", "url": "https://example.com/poll" }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Optional text reason for the dispute",
+                    "example": "The source poll was hijacked."
                   }
-                }
+                },
+                "required": ["agent", "verdict_receipt_hash", "verdict_object", "original_resolver_spec"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Dispute received and processed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "upheld": { "type": "boolean", "example": false },
+                    "dispute_receipt": {
+                      "type": "object",
+                      "properties": {
+                        "hash": { "type": "string", "example": "8f8e8d..." },
+                        "verify": { "type": "string", "example": "https://nolawealthfinancial.com/verify?hash=8f8e8d..." },
+                        "signature": { "type": "string", "example": "dGhpcyBpcyBhIHNpZ25hdHVyZQ==" }
+                      }
+                    },
+                    "summary": { "type": "string", "example": "Dispute REJECTED — fresh re-run outcome matches the original." },
+                    "tier": { "type": "string", "example": "x402" }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -104,20 +160,32 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "trades": {
-                    "type": "string",
-                    "description": "[{t, price, side, outcome}]"
+                    "type": "array",
+                    "description": "Array of trade logs to evaluate",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "t": { "type": "string", "description": "Timestamp or ID of the trade", "example": "2026-07-16T06:00:00Z" },
+                        "price": { "type": "number", "description": "Execution price of the asset", "example": 105.50 },
+                        "side": { "type": "string", "enum": ["buy", "sell"], "example": "buy" },
+                        "outcome": { "type": "number", "description": "Net returns or profit/loss from the trade", "example": 5.20 }
+                      },
+                      "required": ["t", "price", "side", "outcome"]
+                    }
                   }
-                }
+                },
+                "required": ["trades"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Ed25519-signed receipt or verdict."
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -142,20 +210,23 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "entity": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Legal entity or individual name to check against OFAC SDN database",
+                    "example": "Acme Corp"
                   }
-                }
+                },
+                "required": ["entity"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Ed25519-signed receipt or verdict."
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -169,7 +240,7 @@
     "/notary/regulatory-rules": {
       "post": {
         "summary": "Search recent Federal Register RULE documents by agency and/or keyword, signed receipt.",
-        "description": "Pricing: Free up to 15/agent/day, then $0.02 USDC (Base) via x402.",
+        "description": "Pricing: Free up to 15/agent/day, then $0.02 USDC (Base) via x402. Note: Free tier is a PREVIEW ONLY and limits results to 3 records.",
         "operationId": "regulatory_rules",
         "requestBody": {
           "required": true,
@@ -180,15 +251,23 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "agency": {
                     "type": "string",
-                    "description": "string (optional)"
+                    "description": "Federal agency to filter by",
+                    "example": "EPA"
                   },
                   "keyword": {
                     "type": "string",
-                    "description": "string (optional)"
+                    "description": "Search keyword",
+                    "example": "water"
+                  },
+                  "limit": {
+                    "type": "number",
+                    "description": "Maximum number of records to return (paid tier only)",
+                    "example": 10
                   }
                 }
               }
@@ -197,7 +276,24 @@
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Search results returned. Free tier restricts result size and strips signing signatures.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rules": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    },
+                    "preview_only": { "type": "boolean", "description": "True if returned dataset was truncated on free tier" },
+                    "agent": { "type": "string" },
+                    "tier": { "type": "string" },
+                    "signed": { "type": "boolean" }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -211,7 +307,7 @@
     "/notary/federal-awards": {
       "post": {
         "summary": "Search top-100-by-amount federal contract award snapshot (trailing 30 days), signed receipt.",
-        "description": "Pricing: Free up to 15/agent/day, then $0.02 USDC (Base) via x402.",
+        "description": "Pricing: Free up to 15/agent/day, then $0.02 USDC (Base) via x402. Note: Free tier is a PREVIEW ONLY and limits results to 3 records.",
         "operationId": "federal_awards",
         "requestBody": {
           "required": true,
@@ -222,15 +318,23 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "recipient": {
                     "type": "string",
-                    "description": "string (optional)"
+                    "description": "Award recipient name filter",
+                    "example": "Boeing"
                   },
                   "min_amount": {
-                    "type": "string",
-                    "description": "number (optional)"
+                    "type": "number",
+                    "description": "Minimum contract award amount",
+                    "example": 100000
+                  },
+                  "limit": {
+                    "type": "number",
+                    "description": "Maximum number of records to return (paid tier only)",
+                    "example": 10
                   }
                 }
               }
@@ -239,7 +343,24 @@
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Search results returned. Free tier restricts result size and strips signatures.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "awards": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    },
+                    "preview_only": { "type": "boolean" },
+                    "agent": { "type": "string" },
+                    "tier": { "type": "string" },
+                    "signed": { "type": "boolean" }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -253,7 +374,7 @@
     "/notary/insider-conviction": {
       "post": {
         "summary": "Proprietary conviction score over EDGAR Form 4 insider cluster buys, signed receipt.",
-        "description": "Pricing: Free up to 3/agent/day, then $0.1 USDC (Base) via x402.",
+        "description": "Pricing: Free up to 3/agent/day, then $0.10 USDC (Base) via x402. Note: Free tier REDACTS the detailed transaction list, returning only high-level conviction scores.",
         "operationId": "insider_conviction",
         "requestBody": {
           "required": true,
@@ -264,15 +385,23 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "ticker": {
                     "type": "string",
-                    "description": "string (optional)"
+                    "description": "Equity stock ticker",
+                    "example": "AAPL"
                   },
                   "min_conviction": {
-                    "type": "string",
-                    "description": "number (optional)"
+                    "type": "number",
+                    "description": "Minimum conviction score filter threshold",
+                    "example": 50
+                  },
+                  "limit": {
+                    "type": "number",
+                    "description": "Maximum records to return (paid tier only)",
+                    "example": 5
                   }
                 }
               }
@@ -281,7 +410,25 @@
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Conviction metrics returned. Detailed transaction list is redacted on free tier.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conviction": { "type": "number", "example": 85 },
+                    "clusters": {
+                      "type": "array",
+                      "items": { "type": "object" },
+                      "description": "Detailed Form 4 transactions list (Empty on free tier due to redaction)"
+                    },
+                    "redacted": { "type": "boolean", "example": true },
+                    "agent": { "type": "string" },
+                    "tier": { "type": "string" }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -295,7 +442,7 @@
     "/notary/smart-money": {
       "post": {
         "summary": "Proprietary 13D activist x insider conviction composite, signed receipt.",
-        "description": "Pricing: Free up to 3/agent/day, then $0.1 USDC (Base) via x402.",
+        "description": "Pricing: Free up to 3/agent/day, then $0.10 USDC (Base) via x402. Note: Free tier REDACTS the detailed activist transaction logs, returning only the composite score.",
         "operationId": "smart_money",
         "requestBody": {
           "required": true,
@@ -306,15 +453,23 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "ticker": {
                     "type": "string",
-                    "description": "string (optional)"
+                    "description": "Equity stock ticker",
+                    "example": "AAPL"
                   },
                   "apex_only": {
-                    "type": "string",
-                    "description": "boolean (optional)"
+                    "type": "boolean",
+                    "description": "If true, only returns apex signals",
+                    "example": true
+                  },
+                  "limit": {
+                    "type": "number",
+                    "description": "Maximum records to return (paid tier only)",
+                    "example": 5
                   }
                 }
               }
@@ -323,7 +478,25 @@
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Smart money composite metrics. Detailed transaction logs are redacted on free tier.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "composite": { "type": "number", "example": 90 },
+                    "signals": {
+                      "type": "array",
+                      "items": { "type": "object" },
+                      "description": "Detailed transaction signals (Empty on free tier due to redaction)"
+                    },
+                    "redacted": { "type": "boolean", "example": true },
+                    "agent": { "type": "string" },
+                    "tier": { "type": "string" }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -348,20 +521,23 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "ticker": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Stock ticker to check Altman Z-score for",
+                    "example": "AAPL"
                   }
-                }
+                },
+                "required": ["ticker"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Altman Z distress score."
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -386,24 +562,28 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "claim": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Statement or claim description",
+                    "example": "Total rules count under EPA exceeds 500."
                   },
                   "resolver": {
-                    "type": "string",
-                    "description": "{ type, ...resolver-specific fields }"
+                    "type": "object",
+                    "description": "Named external resolver details",
+                    "example": { "type": "rules-count-verify" }
                   }
-                }
+                },
+                "required": ["agent", "claim", "resolver"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Ed25519-signed receipt or verdict."
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -428,15 +608,28 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "counterparty_name": {
                     "type": "string",
-                    "description": "string (optional)"
+                    "description": "Name of legal entity to screen",
+                    "example": "Acme Corp"
                   },
                   "counterparty_wallet": {
                     "type": "string",
-                    "description": "string EVM address (optional)"
+                    "description": "EVM wallet address of counterparty",
+                    "example": "0xFAB07d26F7627fc4cE459ecf90d7E015F7eEcE71"
+                  },
+                  "intent_hash": {
+                    "type": "string",
+                    "description": "Optional transaction intent hash",
+                    "example": "0x9abc..."
+                  },
+                  "max_age_seconds": {
+                    "type": "number",
+                    "description": "Max caching age of verification checks in seconds",
+                    "example": 3600
                   }
                 }
               }
@@ -445,7 +638,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Screening and clearance verdict."
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -470,28 +663,33 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
                   },
                   "max_per_action": {
-                    "type": "string",
-                    "description": "number (optional)"
+                    "type": "number",
+                    "description": "Max budget per action/call",
+                    "example": 0.50
                   },
                   "max_per_day": {
-                    "type": "string",
-                    "description": "number (optional)"
+                    "type": "number",
+                    "description": "Max budget per day",
+                    "example": 5.00
                   },
                   "currency": {
                     "type": "string",
-                    "description": "string (optional)"
+                    "description": "Currency used in spending limits",
+                    "example": "USD"
                   }
-                }
+                },
+                "required": ["agent"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Policy registered."
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -516,24 +714,28 @@
                 "properties": {
                   "agent": {
                     "type": "string",
-                    "description": "string"
+                    "description": "Unique identifier of the calling agent",
+                    "example": "agent-stillos-001"
+                  },
+                  "action": {
+                    "type": "string",
+                    "description": "The description or name of the action being funded",
+                    "example": "distress-score-lookup"
                   },
                   "amount": {
-                    "type": "string",
-                    "description": "number"
-                  },
-                  "currency": {
-                    "type": "string",
-                    "description": "string (optional)"
+                    "type": "number",
+                    "description": "The cost of the proposed action",
+                    "example": 0.15
                   }
-                }
+                },
+                "required": ["agent", "action", "amount"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success \u2014 Ed25519-signed receipt or verdict."
+            "description": "Success — Policy check returned."
           },
           "402": {
             "description": "Payment required (x402). See /.well-known/x402 for the full challenge schema."
@@ -547,5 +749,5 @@
   },
   "x-payment-protocol": "x402",
   "x-payment-discovery": "https://nolawealthfinancial.com/.well-known/x402",
-  "x-generated-from": "live discovery responses (GET on each documented endpoint), not hand-authored \u2014 see each endpoint's own 405 response for the same data"
+  "x-generated-from": "live discovery responses (GET on each documented endpoint), not hand-authored — see each endpoint's own 405 response for the same data"
 }
