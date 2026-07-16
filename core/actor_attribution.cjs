@@ -175,7 +175,7 @@ function highestFunnelStage(reqs) {
     if (r.status === 402) stage = maxStage(stage, '402_ISSUED', order);
     if (r.hasPaymentHeader) stage = maxStage(stage, 'PAYMENT_HEADER_RECEIVED', order);
     if (PAID_PATHS.has(r.path) && r.status === 200) stage = maxStage(stage, 'PAID_RETRY_200', order);
-    if (r.path === '/notary/check' || r.path === '/check') stage = maxStage(stage, 'RECEIPT_VERIFIED', order);
+    if (r.path === '/notary/check' || r.path === '/check' || r.path === '/notary/verify' || r.path === '/verify') stage = maxStage(stage, 'RECEIPT_VERIFIED', order);
   }
   return stage;
 }
@@ -188,7 +188,7 @@ function parseLine(line) {
   const ip = req.remote_ip || '';
   if (ip === SELF_IP) return null; // internal self-traffic excluded from actor attribution entirely
   const ua = ((req.headers || {})['User-Agent'] || [''])[0] || '';
-  const hasPaymentHeader = Object.keys(req.headers || {}).some(h => /^x-payment/i.test(h));
+  const hasPaymentHeader = Object.keys(req.headers || {}).some(h => /^x-payment/i.test(h) || /^payment-signature/i.test(h));
   return {
     ts: d.ts * 1000,
     ip,

@@ -172,7 +172,7 @@ function bazaarExt(inputExample, outputExample) {
 const PAY_LEDGER = path.join('/home/marcus/still-os-consciousness/state/proof-notary', 'notary-payments.jsonl');
 function logPaymentAttempt(req, res) {
   try {
-    const hdr = req.headers['x-payment'];
+    const hdr = req.headers['x-payment'] || req.headers['payment-signature'];
     if (!hdr) return; // only requests that actually carried a payment attempt are logged here
     const status = res.statusCode;
     let network = null, amount_usd = null, payer_wallet = null;
