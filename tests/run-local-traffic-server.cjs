@@ -18,7 +18,8 @@ const mockReceipts = [
   { ts: new Date(Date.now() - 3600000 * 4).toISOString(), agent: 'agent_4868e4adf5', claim: JSON.stringify({ ticker: 'TSLA', z_score: 3.12, flag: 'SAFE' }), receipt_hash: '0x4868e4adf5abcdef1234567890abcdef', verify: 'https://nolawealthfinancial.com/notary/verify?hash=0x4868e4adf5abcdef1234567890abcdef' },
   { ts: new Date(Date.now() - 3600000 * 3).toISOString(), agent: 'agent_1bffaa4457', claim: JSON.stringify({ entity: 'ACME CORP', match: false, hits: [] }), receipt_hash: '0x1bffaa4457abcdef1234567890abcdef', verify: 'https://nolawealthfinancial.com/notary/verify?hash=0x1bffaa4457abcdef1234567890abcdef' },
   { ts: new Date(Date.now() - 3600000 * 2).toISOString(), agent: 'agent_8dd6dd9ca9', claim: JSON.stringify({ ticker: 'NVDA', z_score: 4.89, flag: 'SAFE' }), receipt_hash: '0x8dd6dd9ca9abcdef1234567890abcdef', verify: 'https://nolawealthfinancial.com/notary/verify?hash=0x8dd6dd9ca9abcdef1234567890abcdef' },
-  { ts: new Date(Date.now() - 3600000 * 1).toISOString(), agent: 'agent_76d34a922e', claim: JSON.stringify({ ticker: 'BABA', z_score: 0.85, flag: 'DISTRESS' }), receipt_hash: '0x76d34a922ebbbbbb1234567890abcdef', verify: 'https://nolawealthfinancial.com/notary/verify?hash=0x76d34a922ebbbbbb1234567890abcdef' }
+  { ts: new Date(Date.now() - 3600000 * 1).toISOString(), agent: 'agent_76d34a922e', claim: JSON.stringify({ ticker: 'BABA', z_score: 0.85, flag: 'DISTRESS' }), receipt_hash: '0x76d34a922ebbbbbb1234567890abcdef', verify: 'https://nolawealthfinancial.com/notary/verify?hash=0x76d34a922ebbbbbb1234567890abcdef' },
+  { ts: new Date(Date.now() - 3600000 * 0.5).toISOString(), agent: 'INTERNAL_SYSTEM', actor_class: 'INTERNAL_SYSTEM', claim: 'internal health check', receipt_hash: '0xinternalhealthcheckabcdef1234567890' }
 ];
 
 const receiptsContent = mockReceipts.map(r => JSON.stringify(r)).join('\n') + '\n';
@@ -169,12 +170,12 @@ Module.prototype.require = function (id) {
   return originalRequire.apply(this, arguments);
 };
 
-// Override BIND_IP to localhost
-const serverFilePath = path.join(rootDir, 'core', 'live_traffic_server.cjs');
-let serverSrc = fs.readFileSync(serverFilePath, 'utf8');
+// Override BIND_IP to localhost using environment variable
+process.env.LIVE_TRAFFIC_BIND_IP = '127.0.0.1';
 
-// Temporarily patch BIND_IP in-memory for this process
-const originalServerModule = require(serverFilePath);
+// Load the server module
+require(path.join(rootDir, 'core', 'live_traffic_server.cjs'));
 
 console.log('[Dev Server Sandbox] Localhost environment prepared.');
 console.log('[Dev Server Sandbox] Listening on http://127.0.0.1:8901');
+

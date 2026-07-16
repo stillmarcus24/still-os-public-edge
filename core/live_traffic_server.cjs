@@ -13,6 +13,14 @@ const { spawn } = require('child_process');
 const path = require('path');
 const { buildAttribution } = require('./actor_attribution.cjs');
 
+let actorClassifier = null;
+try {
+  actorClassifier = require('/home/marcus/still-os-consciousness/core/notary_actor_classifier.cjs');
+} catch (e) {
+  // Fallback for environment setup
+}
+
+
 const BIND_IP = process.env.LIVE_TRAFFIC_BIND_IP || '100.111.225.126';
 const PORT = 8901;
 const LOG_FILE = '/var/log/caddy/nolawealth-access.log';
@@ -142,12 +150,17 @@ function getNotaryStats() {
     for (const line of lines) {
       if (!line.trim()) continue;
       let d; try { d = JSON.parse(line); } catch { continue; }
+      
+      const agent = d.agent || d.agent_id;
+      const stored = d.actor_class || 'UNKNOWN_VISITOR';
+      const isInternal = (stored === 'INTERNAL_SYSTEM') || (actorClassifier && typeof actorClassifier.isInternal === 'function' && actorClassifier.isInternal(agent));
+      if (isInternal) continue;
+
       count++;
       if (d.ts) {
         if (!firstTs) firstTs = d.ts;
         lastTs = d.ts;
       }
-      const agent = d.agent || d.agent_id;
       if (agent) uniqueAgents.add(agent);
     }
   } catch (e) {
@@ -173,8 +186,12 @@ function getRecentReceipts(limit) {
       if (!line.trim()) continue;
       let d; try { d = JSON.parse(line); } catch { continue; }
       
-      // Mask agent
       const rawAgent = d.agent || d.agent_id || 'unknown';
+      const stored = d.actor_class || 'UNKNOWN_VISITOR';
+      const isInternal = (stored === 'INTERNAL_SYSTEM') || (actorClassifier && typeof actorClassifier.isInternal === 'function' && actorClassifier.isInternal(rawAgent));
+      if (isInternal) continue;
+      
+      // Mask agent
       let maskedAgent = rawAgent;
       if (rawAgent.length > 10) {
         maskedAgent = rawAgent.slice(0, 8) + '...' + rawAgent.slice(-4);
