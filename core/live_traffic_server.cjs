@@ -13,7 +13,15 @@ const { spawn } = require('child_process');
 const path = require('path');
 const { buildAttribution } = require('./actor_attribution.cjs');
 
-const BIND_IP = '100.111.225.126';
+let actorClassifier = null;
+try {
+  actorClassifier = require('/home/marcus/still-os-consciousness/core/notary_actor_classifier.cjs');
+} catch (e) {
+  // Fallback for environment setup
+}
+
+
+const BIND_IP = process.env.LIVE_TRAFFIC_BIND_IP || '100.111.225.126';
 const PORT = 8901;
 const LOG_FILE = '/var/log/caddy/nolawealth-access.log';
 const LOG_DIR = '/var/log/caddy';
@@ -130,6 +138,171 @@ function computeDailyRollup() {
   dailyCacheAt = Date.now();
   return result;
 }
+
+function getNotaryStats() {
+  let count = 0;
+  const uniqueAgents = new Set();
+  let firstTs = null;
+  let lastTs = null;
+  try {
+    const content = fs.readFileSync(NOTARY_RECEIPTS, 'utf8');
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let d; try { d = JSON.parse(line); } catch { continue; }
+      
+      const agent = d.agent || d.agent_id;
+      const stored = d.actor_class || 'UNKNOWN_VISITOR';
+      const isInternal = (stored === 'INTERNAL_SYSTEM') || (actorClassifier && typeof actorClassifier.isInternal === 'function' && actorClassifier.isInternal(agent));
+      if (isInternal) continue;
+
+      count++;
+      if (d.ts) {
+        if (!firstTs) firstTs = d.ts;
+        lastTs = d.ts;
+      }
+      if (agent) uniqueAgents.add(agent);
+    }
+  } catch (e) {
+    // If receipts.jsonl doesn't exist, we fall back gracefully.
+  }
+  return {
+    receipts_total: count,
+    unique_agents: uniqueAgents.size,
+    first_receipt_ts: firstTs,
+    last_receipt_ts: lastTs,
+    since_start: totals.sinceStart,
+    uptime_seconds: Math.round((Date.now() - new Date(totals.sinceStart).getTime()) / 1000)
+  };
+}
+
+function getRecentReceipts(limit) {
+  const list = [];
+  try {
+    const content = fs.readFileSync(NOTARY_RECEIPTS, 'utf8');
+    const lines = content.split('\n');
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      let d; try { d = JSON.parse(line); } catch { continue; }
+      
+      const rawAgent = d.agent || d.agent_id || 'unknown';
+      const stored = d.actor_class || 'UNKNOWN_VISITOR';
+      const isInternal = (stored === 'INTERNAL_SYSTEM') || (actorClassifier && typeof actorClassifier.isInternal === 'function' && actorClassifier.isInternal(rawAgent));
+      if (isInternal) continue;
+      
+      // Mask agent
+      let maskedAgent = rawAgent;
+      if (rawAgent.length > 10) {
+        maskedAgent = rawAgent.slice(0, 8) + '...' + rawAgent.slice(-4);
+      }
+      
+      // Try to parse claim to understand what it was
+      let claimSummary = 'Verified Claim';
+      if (d.claim) {
+        try {
+          const parsed = JSON.parse(d.claim);
+          if (parsed.ticker) {
+            claimSummary = `Distress Score for ${parsed.ticker}`;
+            if (parsed.flag) claimSummary += ` (${parsed.flag})`;
+          } else if (parsed.entity) {
+            claimSummary = `Sanctions Screen: ${parsed.entity}`;
+          } else if (parsed.verdict) {
+            claimSummary = `Verdict: ${parsed.verdict}`;
+          }
+        } catch {
+          // If claim is not JSON, truncate it
+          claimSummary = d.claim.length > 50 ? d.claim.slice(0, 47) + '...' : d.claim;
+        }
+      }
+
+      list.push({
+        ts: d.ts,
+        agent: maskedAgent,
+        claim_summary: claimSummary,
+        receipt_hash: d.receipt_hash || null,
+        verify_url: d.verify || d.verify_url || (d.receipt_hash ? `https://nolawealthfinancial.com/notary/verify?hash=${d.receipt_hash}` : null)
+      });
+      if (list.length >= limit) break;
+    }
+  } catch (e) {
+    // Graceful fallback
+  }
+  return list;
+}
+
+const CONVERSION_LOG = '/home/marcus/still-os-consciousness/state/proof-notary/conversion-tracking.jsonl';
+function getConversionStats() {
+  const stats = {};
+  const ENDPOINTS = [
+    '/distress-score',
+    '/regulatory-rules',
+    '/federal-awards',
+    '/insider-conviction',
+    '/smart-money'
+  ];
+  
+  for (const ep of ENDPOINTS) {
+    stats[ep] = { free_hits: 0, paid_conversions: 0, conversion_rate: 0 };
+  }
+
+  try {
+    if (fs.existsSync(CONVERSION_LOG)) {
+      const content = fs.readFileSync(CONVERSION_LOG, 'utf8');
+      const lines = content.split('\n').filter(Boolean);
+      
+      const freeHits = [];
+      const paidHits = new Map();
+
+      for (const line of lines) {
+        let entry;
+        try { entry = JSON.parse(line); } catch { continue; }
+        if (!entry.endpoint || !entry.signature || !entry.ts) continue;
+
+        if (entry.type === 'free') {
+          freeHits.push(entry);
+        } else if (entry.type === 'paid') {
+          if (!paidHits.has(entry.signature)) {
+            paidHits.set(entry.signature, []);
+          }
+          paidHits.get(entry.signature).push(new Date(entry.ts).getTime());
+        }
+      }
+
+      const WINDOW_MS = 24 * 3600 * 1000;
+
+      for (const free of freeHits) {
+        const ep = free.endpoint;
+        if (!stats[ep]) {
+          stats[ep] = { free_hits: 0, paid_conversions: 0, conversion_rate: 0 };
+        }
+        stats[ep].free_hits++;
+
+        const freeTime = new Date(free.ts).getTime();
+        const paidTimes = paidHits.get(free.signature) || [];
+
+        const converted = paidTimes.some(paidTime => {
+          return paidTime >= freeTime && (paidTime - freeTime) <= WINDOW_MS;
+        });
+
+        if (converted) {
+          stats[ep].paid_conversions++;
+        }
+      }
+
+      for (const ep in stats) {
+        const s = stats[ep];
+        s.conversion_rate = s.free_hits > 0 ? parseFloat((s.paid_conversions / s.free_hits).toFixed(4)) : 0;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return stats;
+}
+
+
 
 // ---- IP enrichment: cache + throttled queue (ip-api.com free tier, ~45 req/min) ----
 const geoCache = new Map();
@@ -259,6 +432,32 @@ let attributionCache = null, attributionCacheAt = 0, attributionInFlight = null;
 const ATTRIBUTION_TTL_MS = 5 * 60000; // geo enrichment is rate-limited; don't recompute every request
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/conversion-stats.json') {
+    let payload;
+    try { payload = getConversionStats(); }
+    catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' });
+    return res.end(JSON.stringify(payload));
+  }
+  if (req.url === '/notary-stats.json') {
+
+    let payload;
+    try { payload = getNotaryStats(); }
+    catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' });
+    return res.end(JSON.stringify(payload));
+  }
+  if (req.url.startsWith('/receipts.json')) {
+    let payload;
+    try {
+      const u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const limit = Math.min(parseInt(u.searchParams.get('limit'), 10) || 20, 100);
+      payload = getRecentReceipts(limit);
+    }
+    catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' });
+    return res.end(JSON.stringify(payload));
+  }
   if (req.url === '/daily.json') {
     let payload;
     try { payload = computeDailyRollup(); }
