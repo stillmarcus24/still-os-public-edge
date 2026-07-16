@@ -219,6 +219,42 @@ function dispatchX402(req, res) {
   app402(req, res);
 }
 
+const CONVERSION_LOG = path.join('/home/marcus/still-os-consciousness/state/proof-notary', 'conversion-tracking.jsonl');
+function logConversionHit(type, endpoint, agent, params, req) {
+  try {
+    const keys = Object.keys(params || {}).sort();
+    const sortedParams = {};
+    for (const k of keys) {
+      if (k === 'agent') continue;
+      sortedParams[k] = params[k];
+    }
+    const ip = (req && (req.headers['x-real-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0].trim())) || null;
+    const signaturePayload = JSON.stringify({
+      endpoint,
+      agent: agent || 'anon',
+      ip,
+      params: sortedParams
+    });
+    const signature = crypto.createHash('sha256').update(signaturePayload).digest('hex');
+    const logEntry = JSON.stringify({
+      ts: new Date().toISOString(),
+      type,
+      endpoint,
+      agent,
+      signature
+    });
+    const dir = path.dirname(CONVERSION_LOG);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.appendFileSync(CONVERSION_LOG, logEntry + '\n');
+    return signature;
+  } catch (e) {
+    // ignore
+  }
+}
+
+
 // API-key auth for /commit (2026-07-08) -- ported from proof_endpoint.cjs's keyValid().
 // Closes the real blocker found while scoping the 8455 retirement: 4 internal callers
 // (stillos_mcp_server.cjs, stillos_agentkit_provider.cjs, signal_endpoint.cjs,
@@ -416,6 +452,7 @@ try {
       if (!fedRegister) return res.status(503).json({ error: 'lookup module unavailable' });
       const b = req.body || {};
       const agent = b.agent || 'anon';
+      logConversionHit('paid', '/regulatory-rules', agent, b, req);
       const result = fedRegister.search({ agency: b.agency, keyword: b.keyword, limit: b.limit });
       const { privateKey, notary_fp } = signer.loadPrivateKey();
       const actorClassifier = require('/home/marcus/still-os-consciousness/core/notary_actor_classifier.cjs');
@@ -430,6 +467,7 @@ try {
       if (!usaSpending) return res.status(503).json({ error: 'lookup module unavailable' });
       const b = req.body || {};
       const agent = b.agent || 'anon';
+      logConversionHit('paid', '/federal-awards', agent, b, req);
       const result = usaSpending.search({ recipient: b.recipient, min_amount: b.min_amount, limit: b.limit });
       const { privateKey, notary_fp } = signer.loadPrivateKey();
       const actorClassifier = require('/home/marcus/still-os-consciousness/core/notary_actor_classifier.cjs');
@@ -444,6 +482,7 @@ try {
       if (!insiderConviction) return res.status(503).json({ error: 'lookup module unavailable' });
       const b = req.body || {};
       const agent = b.agent || 'anon';
+      logConversionHit('paid', '/insider-conviction', agent, b, req);
       const result = insiderConviction.top({ ticker: b.ticker, min_conviction: b.min_conviction, limit: b.limit });
       const { privateKey, notary_fp } = signer.loadPrivateKey();
       const actorClassifier = require('/home/marcus/still-os-consciousness/core/notary_actor_classifier.cjs');
@@ -458,6 +497,7 @@ try {
       if (!smartMoney) return res.status(503).json({ error: 'lookup module unavailable' });
       const b = req.body || {};
       const agent = b.agent || 'anon';
+      logConversionHit('paid', '/smart-money', agent, b, req);
       const result = smartMoney.top({ ticker: b.ticker, apex_only: b.apex_only, limit: b.limit });
       const { privateKey, notary_fp } = signer.loadPrivateKey();
       const actorClassifier = require('/home/marcus/still-os-consciousness/core/notary_actor_classifier.cjs');
@@ -473,6 +513,7 @@ try {
       const b = req.body || {};
       const agent = b.agent || 'anon';
       if (!b.ticker) return res.status(400).json({ error: 'ticker required' });
+      logConversionHit('paid', '/distress-score', agent, b, req);
       const result = await distressScore.score(b.ticker);
       const { privateKey, notary_fp } = signer.loadPrivateKey();
       const actorClassifier = require('/home/marcus/still-os-consciousness/core/notary_actor_classifier.cjs');
@@ -1221,7 +1262,8 @@ const server = http.createServer((req, res) => {
           result.rules = result.rules.slice(0, 3);
           result.preview_only = true;
         }
-        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
+        const signature = logConversionHit('free', '/regulatory-rules', agent, b, req);
+        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null, request_signature: signature,
           upgrade: 'PREVIEW ONLY & UNSIGNED. The free tier limits rule search results to 3 records. Retry this exact request with an x402 X-PAYMENT header to receive the full dataset with a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });
@@ -1256,7 +1298,8 @@ const server = http.createServer((req, res) => {
           result.awards = result.awards.slice(0, 3);
           result.preview_only = true;
         }
-        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
+        const signature = logConversionHit('free', '/federal-awards', agent, b, req);
+        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null, request_signature: signature,
           upgrade: 'PREVIEW ONLY & UNSIGNED. The free tier limits award results to 3 records. Retry this exact request with an x402 X-PAYMENT header to receive the full dataset with a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });
@@ -1291,7 +1334,8 @@ const server = http.createServer((req, res) => {
           result.clusters = [];
           result.redacted = true;
         }
-        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
+        const signature = logConversionHit('free', '/insider-conviction', agent, b, req);
+        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null, request_signature: signature,
           upgrade: 'PROPRIETARY ANALYSIS REDACTED & UNSIGNED. The free tier only exposes the high-level conviction score. Retry this exact request with an x402 X-PAYMENT header to unlock the detailed Form 4 transactions list and a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });
@@ -1326,7 +1370,8 @@ const server = http.createServer((req, res) => {
           result.signals = [];
           result.redacted = true;
         }
-        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
+        const signature = logConversionHit('free', '/smart-money', agent, b, req);
+        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null, request_signature: signature,
           upgrade: 'PROPRIETARY ANALYSIS REDACTED & UNSIGNED. The free tier only exposes the composite score. Retry this exact request with an x402 X-PAYMENT header to unlock the detailed activator/insider transaction signals list and a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });
@@ -1362,7 +1407,8 @@ const server = http.createServer((req, res) => {
         // verifiable receipt is the paid product. findings-feed still records the
         // (unsigned) result happened -- receipt_hash null marks it as unsigned there too.
         appendFindingsFeed({ ticker: result.ticker, status: result.status, receipt_hash: null, ts: new Date().toISOString() });
-        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null,
+        const signature = logConversionHit('free', '/distress-score', agent, b, req);
+        return send(res, 200, { ...result, agent, tier: 'free', signed: false, receipt_hash: null, signature: null, verify: null, request_signature: signature,
           upgrade: 'UNSIGNED — this result is not independently verifiable and cannot be shown to a counterparty. Retry this exact request with an x402 X-PAYMENT header for a signed, verifiable receipt.' });
       } catch (e) { return send(res, 400, { error: e.message }); }
     });

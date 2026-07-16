@@ -214,6 +214,78 @@ function getRecentReceipts(limit) {
   return list;
 }
 
+const CONVERSION_LOG = '/home/marcus/still-os-consciousness/state/proof-notary/conversion-tracking.jsonl';
+function getConversionStats() {
+  const stats = {};
+  const ENDPOINTS = [
+    '/distress-score',
+    '/regulatory-rules',
+    '/federal-awards',
+    '/insider-conviction',
+    '/smart-money'
+  ];
+  
+  for (const ep of ENDPOINTS) {
+    stats[ep] = { free_hits: 0, paid_conversions: 0, conversion_rate: 0 };
+  }
+
+  try {
+    if (fs.existsSync(CONVERSION_LOG)) {
+      const content = fs.readFileSync(CONVERSION_LOG, 'utf8');
+      const lines = content.split('\n').filter(Boolean);
+      
+      const freeHits = [];
+      const paidHits = new Map();
+
+      for (const line of lines) {
+        let entry;
+        try { entry = JSON.parse(line); } catch { continue; }
+        if (!entry.endpoint || !entry.signature || !entry.ts) continue;
+
+        if (entry.type === 'free') {
+          freeHits.push(entry);
+        } else if (entry.type === 'paid') {
+          if (!paidHits.has(entry.signature)) {
+            paidHits.set(entry.signature, []);
+          }
+          paidHits.get(entry.signature).push(new Date(entry.ts).getTime());
+        }
+      }
+
+      const WINDOW_MS = 24 * 3600 * 1000;
+
+      for (const free of freeHits) {
+        const ep = free.endpoint;
+        if (!stats[ep]) {
+          stats[ep] = { free_hits: 0, paid_conversions: 0, conversion_rate: 0 };
+        }
+        stats[ep].free_hits++;
+
+        const freeTime = new Date(free.ts).getTime();
+        const paidTimes = paidHits.get(free.signature) || [];
+
+        const converted = paidTimes.some(paidTime => {
+          return paidTime >= freeTime && (paidTime - freeTime) <= WINDOW_MS;
+        });
+
+        if (converted) {
+          stats[ep].paid_conversions++;
+        }
+      }
+
+      for (const ep in stats) {
+        const s = stats[ep];
+        s.conversion_rate = s.free_hits > 0 ? parseFloat((s.paid_conversions / s.free_hits).toFixed(4)) : 0;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return stats;
+}
+
+
 
 // ---- IP enrichment: cache + throttled queue (ip-api.com free tier, ~45 req/min) ----
 const geoCache = new Map();
@@ -343,7 +415,15 @@ let attributionCache = null, attributionCacheAt = 0, attributionInFlight = null;
 const ATTRIBUTION_TTL_MS = 5 * 60000; // geo enrichment is rate-limited; don't recompute every request
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/conversion-stats.json') {
+    let payload;
+    try { payload = getConversionStats(); }
+    catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' });
+    return res.end(JSON.stringify(payload));
+  }
   if (req.url === '/notary-stats.json') {
+
     let payload;
     try { payload = getNotaryStats(); }
     catch (e) { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }

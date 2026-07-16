@@ -347,7 +347,41 @@
     font-size: 12.5px;
   }
   footer .b { color: var(--ink); }
+
+  .telemetry-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  .telemetry-table th, .telemetry-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+  }
+  .telemetry-table th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--mut);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .telemetry-table td {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+  .rate-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .rate-badge.high { background: rgba(63, 179, 127, 0.15); color: var(--emerald); }
+  .rate-badge.medium { background: rgba(200, 162, 74, 0.15); color: var(--brass); }
+  .rate-badge.low { background: rgba(224, 104, 95, 0.15); color: var(--red); }
 </style>
+
 </head>
 <body>
 <div class="wrap">
@@ -431,7 +465,34 @@
     </div>
   </div>
 
+  <!-- Section 2.5: Conversion Telemetry Table -->
+  <div class="section-title">Free-to-Paid Conversion Telemetry</div>
+  <div class="stat-card" style="padding: 24px; margin-top: 16px; margin-bottom: 24px;">
+    <h3 style="margin: 0 0 12px; font-family:'Newsreader',serif; font-weight:normal; font-size:22px;">Free-tier GTM Signals & Paid Conversions</h3>
+    <p style="color:var(--mut); font-size:14px; margin-top:-6px; margin-bottom:20px;">
+      Tracking conversion loops where an agent performs a free-tier preview request, then returns within 24 hours with an x402 payment header to obtain a cryptographically signed, verifiable receipt.
+    </p>
+    <div style="overflow-x: auto;">
+      <table class="telemetry-table">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--line); text-align: left;">
+            <th style="padding: 10px;">Endpoint</th>
+            <th style="padding: 10px;">Free-tier Previews</th>
+            <th style="padding: 10px;">Paid Conversions</th>
+            <th style="padding: 10px;">Conversion Rate</th>
+          </tr>
+        </thead>
+        <tbody id="conversion-stats-body">
+          <tr>
+            <td colspan="4" style="text-align: center; padding: 20px; color: var(--mut); font-style: italic;">Loading conversion telemetry...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Section 3: Verified Receipts & Live Logs -->
+
   <div class="grid-2" style="margin-top: 36px;">
     <!-- Left Column: Redacted Receipts Feed -->
     <div>
@@ -533,9 +594,47 @@
         });
     }
 
+    function loadConversionStats() {
+      fetch('/conversion-stats.json', { cache: 'no-store' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var tbody = document.getElementById('conversion-stats-body');
+          var eps = Object.keys(data);
+          if (eps.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--mut); font-style: italic;">No conversion data logged.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = eps.map(function(ep) {
+            var row = data[ep];
+            var rate = (row.conversion_rate * 100).toFixed(2) + '%';
+            var badgeCls = 'low';
+            if (row.conversion_rate >= 0.15) badgeCls = 'high';
+            else if (row.conversion_rate >= 0.05) badgeCls = 'medium';
+            
+            return '<tr style="border-bottom: 1px solid var(--line);">' +
+              '<td style="padding: 12px 10px; font-weight: 500; color: var(--ink);">' + ep + '</td>' +
+              '<td style="padding: 12px 10px; color: var(--mut);">' + row.free_hits.toLocaleString() + '</td>' +
+              '<td style="padding: 12px 10px; color: var(--mut);">' + row.paid_conversions.toLocaleString() + '</td>' +
+              '<td style="padding: 12px 10px;">' +
+                '<span class="rate-badge ' + badgeCls + '">' + rate + '</span>' +
+              '</td>' +
+            '</tr>';
+          }).join('');
+        })
+        .catch(function() {
+          document.getElementById('conversion-stats-body').innerHTML = 
+            '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--red); font-style: italic;">Error loading conversion stats.</td></tr>';
+        });
+    }
+
     // Fetch initial data
     loadStatsAndReceipts();
-    setInterval(loadStatsAndReceipts, 30000); // refresh every 30s
+    loadConversionStats();
+    setInterval(function() {
+      loadStatsAndReceipts();
+      loadConversionStats();
+    }, 30000); // refresh every 30s
+
 
     // Funnel drawing helper
     function drawFunnel(actors) {
@@ -681,6 +780,7 @@
               appendLog(packet.evt);
               // Also update stats if totals are returned
               loadStatsAndReceipts(); // reload stats on hits to keep in sync
+              loadConversionStats();
             }
           }
         } catch(err) {

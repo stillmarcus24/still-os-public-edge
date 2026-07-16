@@ -36,6 +36,26 @@ const mockLogs = [
 const logsContent = mockLogs.map(l => JSON.stringify(l)).join('\n') + '\n';
 fs.writeFileSync(path.join(localMockDir, 'nolawealth-access.log'), logsContent);
 
+// Generate initial mock conversion tracking logs
+const mockConversionLogs = [
+  // /distress-score conversion (converted within window)
+  { ts: new Date(Date.now() - 3600000 * 2).toISOString(), type: 'free', endpoint: '/distress-score', agent: 'agent_76d34a922e', signature: 'sig_distress_1' },
+  { ts: new Date(Date.now() - 3600000 * 1).toISOString(), type: 'paid', endpoint: '/distress-score', agent: 'agent_76d34a922e', signature: 'sig_distress_1' },
+  
+  // /distress-score non-conversion
+  { ts: new Date(Date.now() - 3600000 * 3).toISOString(), type: 'free', endpoint: '/distress-score', agent: 'agent_4868e4adf5', signature: 'sig_distress_2' },
+  
+  // /regulatory-rules conversion
+  { ts: new Date(Date.now() - 3600000 * 4).toISOString(), type: 'free', endpoint: '/regulatory-rules', agent: 'agent_1bffaa4457', signature: 'sig_reg_1' },
+  { ts: new Date(Date.now() - 3600000 * 3.5).toISOString(), type: 'paid', endpoint: '/regulatory-rules', agent: 'agent_1bffaa4457', signature: 'sig_reg_1' },
+  
+  // /regulatory-rules non-conversion
+  { ts: new Date(Date.now() - 3600000 * 5).toISOString(), type: 'free', endpoint: '/regulatory-rules', agent: 'agent_8dd6dd9ca9', signature: 'sig_reg_2' }
+];
+const conversionContent = mockConversionLogs.map(l => JSON.stringify(l)).join('\n') + '\n';
+fs.writeFileSync(path.join(localMockDir, 'conversion-tracking.jsonl'), conversionContent);
+
+
 // Helper to normalize path matching
 function isHomePath(filePath) {
   if (typeof filePath !== 'string') return false;
