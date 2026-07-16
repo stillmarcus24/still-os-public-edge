@@ -1,0 +1,75 @@
+name: main-push-guard
+
+# This repo is private on the GitHub Free plan, so classic branch protection
+# and repository rulesets ("require PR before merging to main") are not
+# available (both return 403 Upgrade to Pro). This workflow is the free-tier
+# substitute: it reacts to any push landing on main from someone other than
+# the founder, immediately reverts main back to the prior commit, and opens
+# an issue with the details so the change can be resubmitted the required
+# way (feature branch -> PR -> CODEOWNERS review).
+#
+# Runs entirely on GitHub-hosted infra -- not a new process on the founder's
+# box, no new secrets, uses only the auto-issued GITHUB_TOKEN.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    if: github.actor != 'stillmarcus24'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Revert unauthorized direct push to main
+        run: |
+          set -e
+          git config user.name "main-push-guard[bot]"
+          git config user.email "actions@github.com"
+          BLOCKED_SHA="${{ github.sha }}"
+          PARENT_SHA=$(git rev-parse HEAD^)
+          git reset --hard "$PARENT_SHA"
+          git push --force origin HEAD:main
+          echo "BLOCKED_SHA=$BLOCKED_SHA" >> "$GITHUB_ENV"
+          echo "PARENT_SHA=$PARENT_SHA" >> "$GITHUB_ENV"
+
+      - name: Open incident issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pusher = context.payload.pusher && context.payload.pusher.name || context.actor;
+            const blockedSha = process.env.BLOCKED_SHA;
+            const parentSha = process.env.PARENT_SHA;
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Blocked direct push to main by ${pusher}`,
+              body: [
+                `A direct push to \`main\` by **${pusher}** was auto-reverted.`,
+                ``,
+                `Blocked commit: ${repoUrl}/commit/${blockedSha}`,
+                `main reset to: ${repoUrl}/commit/${parentSha}`,
+                ``,
+                `Required workflow: create a feature branch off main, push it, and open a`,
+                `pull request into main. CODEOWNERS will automatically request @stillmarcus24`,
+                `as reviewer for anything touching payment/x402/wallet/signer/receipt paths.`,
+                ``,
+                `Your original commit still exists at ${blockedSha} -- cherry-pick it onto a`,
+                `new branch to resubmit it the required way:`,
+                '```',
+                `git fetch origin`,
+                `git checkout -b val/resubmit-fix origin/main`,
+                `git cherry-pick ${blockedSha}`,
+                `git push origin val/resubmit-fix`,
+                '```',
+              ].join('\n'),
+            });
