@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "label": "npm: test - Run All Tests"
+    },
+    {
+      "type": "npm",
+      "script": "syntax-check",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "npm: syntax-check - Validate Code Syntax"
+    },
+    {
+      "type": "npm",
+      "script": "start",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "npm: start - Run Local Emulator Server"
+    }
+  ]
+}

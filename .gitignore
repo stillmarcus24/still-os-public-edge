@@ -46,3 +46,7 @@ state/
 !reports/
 !reports/*.md
 !reports/*.json
+
+# Local development mock state & scratch scripts
+local-mock/
+tests/test-redactions.cjs
