@@ -188,7 +188,7 @@ function parseLine(line) {
   const ip = req.remote_ip || '';
   if (ip === SELF_IP) return null; // internal self-traffic excluded from actor attribution entirely
   const ua = ((req.headers || {})['User-Agent'] || [''])[0] || '';
-  const hasPaymentHeader = Object.keys(req.headers || {}).some(h => /^x-payment/i.test(h) || /^payment-signature/i.test(h));
+  const hasPaymentHeader = Object.keys(req.headers || {}).some(h => /^x-payment/i.test(h));
   return {
     ts: d.ts * 1000,
     ip,
@@ -272,4 +272,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { buildAttribution, formatActorReport };
+module.exports = { buildAttribution, formatActorReport, highestFunnelStage, parseLine };
