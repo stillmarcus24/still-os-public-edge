@@ -1,5 +1,7 @@
 # still-os-public-edge
 
+**[stillosdigitalholdings.com](https://stillosdigitalholdings.com)** — the product this repo is the public edge for.
+
 The public-facing surface of StillOS's Notary service — the part designed for machine
 buyers (AI agents, scrapers, discovery bots) to find, evaluate, and pay for signed data
 verdicts via [x402](https://x402.org). This repo is the **collaborative development
